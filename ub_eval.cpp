@@ -7,21 +7,12 @@
 #include <iostream>
 #include <fstream>
 #include <getopt.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 
 #include "src/vg.hpp"
 
 using namespace vg;
 using namespace std;
 
-
-void help_main(char** argv)
-{
-    cerr << "usage: " << argv[0] << " [options] VGFILE OUTPUT_DIR" << endl
-         << "Generate some reports on bubble decomposition of given graph" << endl
-         << "    -h, --help          print this help message" << endl;
-}
 
 // get total length, total nodes in graph
 pair<int, int> graph_stats(VG& graph)
@@ -249,7 +240,7 @@ void chain_stats(VG& graph, BubbleTree* bubble_tree) {
 }
 
 
-void ultra_stats(VG& graph, const string& out_dir)
+void ultra_stats(VG& graph)
 {
     cerr << "Computing ultrabubbles" << endl;
     auto bubbles = vg::ultrabubbles(graph);
@@ -266,7 +257,7 @@ void ultra_stats(VG& graph, const string& out_dir)
     delete bubble_tree;
 }
 
-void super_stats(VG& graph, const string& out_dir)
+void super_stats(VG& graph)
 {
     cerr << "Computing superbubbles" << endl;
     auto bubbles = vg::superbubbles(graph);
@@ -275,6 +266,13 @@ void super_stats(VG& graph, const string& out_dir)
     bs.compute_stats(graph, bubbles);
     cout << "Super bubbles stats" << endl << bs << endl;
   
+}
+
+void help_main(char** argv)
+{
+    cerr << "usage: " << argv[0] << " [options] VGFILE" << endl
+         << "Generate some reports on bubble decomposition of given graph" << endl
+         << "    -h, --help          print this help message" << endl;
 }
 
 int main(int argc, char** argv)
@@ -311,15 +309,14 @@ int main(int argc, char** argv)
         }
     }
 
-    if(argc - optind < 2) {
-        // We don't have two positional arguments
+    if(argc - optind < 1) {
+        // We don't have one positional arguments
         // Print the help
         help_main(argv);
         return 1;
     }
 
     string vg_file = argv[optind++];
-    string out_dir = argv[optind++]; 
     
     // Open the vg file
     cerr << "Loading vg" << endl;
@@ -333,11 +330,8 @@ int main(int argc, char** argv)
     cerr << "Sorting vg" << endl;
     graph.sort();
 
-    // Make the output directory
-    mkdir(out_dir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-
-    ultra_stats(graph, out_dir);
-    super_stats(graph, out_dir);
+    ultra_stats(graph);
+    super_stats(graph);
   
     return 0;
 }
