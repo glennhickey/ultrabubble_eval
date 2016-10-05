@@ -6,7 +6,7 @@ VGDIR=../vg
 
 VGLIBDIR=$(VGDIR)/lib
 CXX=g++
-INCLUDES=-I$(VGDIR)/ -Ivg/include
+INCLUDES=-I$(VGDIR)/ -I$(VGDIR)/include
 CXXFLAGS:=-O3 -msse4.1 -fopenmp -std=c++11 -ggdb -g $(INCLUDES)
 LDSEARCH=-L$(VGDIR)/src -L$(VGLIBDIR)
 LDFLAGS=-lm -lpthread -lz -lbz2 -lsnappy -ldivsufsort -ldivsufsort64 -ljansson $(LDSEARCH)
