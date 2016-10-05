@@ -95,15 +95,19 @@ struct BubbleStats {
        visit_count[i] = depth + 1;
      }
 
+     add_bubble(graph, ends, bubble, depth);
+   }
+
+   void add_bubble(VG& graph, std::pair<vg::id_t, vg::id_t> ends, const vector<vg::id_t>& bubble, int depth) {
      // add bubble stats to tracker for the given depth
      while (tally_map.size() < depth + 1) {
        tally_map.push_back(Tally());
      }
      tally_map[depth].add_bubble(graph, ends, bubble);
      // add bubble stats for overall count
-     tally_map[0].add_bubble(graph, ends, bubble);       
+     tally_map[0].add_bubble(graph, ends, bubble);            
    }
-
+   
    struct bub_less {
       bool operator()(const std::vector<vg::id_t>& b1, const std::vector<vg::id_t>& b2) const {
           return b1.size() < b2.size();
@@ -160,6 +164,71 @@ ostream& operator<<(ostream& os, BubbleStats& t) {
   return os;
 }
 
+void cycle_stats(VG& graph, BubbleTree* bubble_tree)
+{
+  cerr << "Computing cycle stats" << endl;
+
+  // start by splitting bubbles into two groups by cyclicity
+  std::map<std::pair<vg::id_t, vg::id_t>, std::vector<vg::id_t> > acyclic_bubbles;
+  std::map<std::pair<vg::id_t, vg::id_t>, std::vector<vg::id_t> > cyclic_bubbles;
+  
+  bubble_tree->for_each_preorder([&](BubbleTree::Node* node) {
+      // cut root to be consistent with superbubbles()
+      if (node != bubble_tree->root) {
+        Bubble& bubble = node->v;
+        // sort nodes to be consistent with superbubbles
+        sort(bubble.contents.begin(), bubble.contents.end());
+        if (bubble.acyclic) {
+          acyclic_bubbles[make_pair(bubble.start.node, bubble.end.node)] = bubble.contents;
+        } else {
+          cyclic_bubbles[make_pair(bubble.start.node, bubble.end.node)] = bubble.contents;
+        }
+      }
+    });
+
+  // now just rerun our stats separately on each group
+  BubbleStats acyclic_bs;
+  acyclic_bs.compute_stats(graph, acyclic_bubbles);
+  BubbleStats cyclic_bs;
+  cyclic_bs.compute_stats(graph, cyclic_bubbles);
+
+  cout << "Acyclic ultra bubbles stats" << endl << acyclic_bs << endl;  
+  cout << "Cyclic ultra bubbles stats" << endl << cyclic_bs << endl;
+}
+
+void chain_stats(VG& graph, BubbleTree* bubble_tree) {
+  cerr << "Computing chain stats" << endl;
+
+  auto get_depth = [&](BubbleTree::Node* node) {
+    int depth = 0;
+    for (; node != bubble_tree->root; ++depth, node = node->parent);
+    return depth;
+  };
+  
+  BubbleStats chains_bs;
+
+  bubble_tree->for_each_preorder([&](BubbleTree::Node* node) {
+
+      Bubble& bubble = node->v;
+      for (int i = 0; i < bubble.chain_offsets.size(); ++i)
+      {
+        int last = i == bubble.chain_offsets.size() - 1 ? node->children.size() - 1 : bubble.chain_offsets[i+1] - 1;
+        vector<vg::id_t> chain_nodes;
+        for (int j = bubble.chain_offsets[i]; j <= last; ++j) {
+          chain_nodes.push_back(node->children[i]->v.start.node);
+          if (j == last) {
+            chain_nodes.push_back(node->children[i]->v.end.node);
+          }
+        }
+
+        chains_bs.add_bubble(graph, std::pair<vg::id_t, vg::id_t>(0, 0), chain_nodes, get_depth(node));
+      }      
+    });
+
+  cout << "Chains stats" << endl << chains_bs << endl;
+}
+
+
 void ultra_stats(VG& graph, const string& out_dir)
 {
   cerr << "Computing ultrabubbles" << endl;
@@ -171,21 +240,10 @@ void ultra_stats(VG& graph, const string& out_dir)
   
   cerr << "Computing ultrabubbles" << endl;
   BubbleTree* bubble_tree = ultrabubble_tree(graph);
-  cerr << "Computing chain stats" << endl;
-  // todo
 
+  cycle_stats(graph, bubble_tree);
+  chain_stats(graph, bubble_tree);
   delete bubble_tree;
-
-/*
-    bubble_tree->for_each_preorder([&](BubbleTree::Node* node) {
-            // cut root to be consistent with superbubbles()
-            if (node != bubble_tree->root) {
-                Bubble& bubble = node->v;
-                // sort nodes to be consistent with superbubbles
-                sort(bubble.contents.begin(), bubble.contents.end());
-            }
-        });
- */
 }
 
 void super_stats(VG& graph, const string& out_dir)
