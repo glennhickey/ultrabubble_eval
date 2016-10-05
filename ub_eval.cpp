@@ -155,7 +155,7 @@ ostream& operator<<(ostream& os, BubbleStats& bs) {
        << endl;
     for (int i = 0; i < bs.tally_map.size(); ++i) {
         const BubbleStats::Tally& t = bs.tally_map[i];
-        os << i << "\t"
+        os << (i == 0 ? "all" : to_string(i)) << "\t"
 
            << t.count << "\t"
            << t.total_length << "\t"
