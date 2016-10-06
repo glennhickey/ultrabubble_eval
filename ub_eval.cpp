@@ -259,7 +259,7 @@ void cycle_stats(VG& graph, BubbleTree* bubble_tree)
     cout << "Cyclic ultra bubbles stats" << endl << cyclic_bs << endl;
 }
 
-void chain_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int bin_size) {
+BubbleStats chain_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int bin_size) {
     cerr << "Computing chain stats" << endl;
 
     auto get_depth = [&](BubbleTree::Node* node) {
@@ -302,8 +302,84 @@ void chain_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int bin_size
         *hist << "Chains Histograms" << endl;
     }
     histograms(hist, chains_bs, bin_size);
+    return chains_bs;
 }
 
+BubbleStats missing_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int bin_size) {
+    cerr << "Computing missing stats" << endl;
+    std::set<vg::id_t> found_nodes;
+      
+    BubbleStats missing_bs;
+    missing_bs.gs = graph_stats(graph);
+
+    for (auto tn : bubble_tree->root->children) {
+        Bubble& bubble = tn->v;
+        // insert every node inside a bubble
+        for (auto bn : bubble.contents) {
+            if (bn != bubble.start.node && bn != bubble.end.node) {
+                found_nodes.insert(bn);
+            }
+        }
+    }
+
+    // todo: move this code to bubbles.hpp?  or otherwise merge with logic in chains_stats here.
+    // insert every chain node
+    BubbleTree::Node* node = bubble_tree->root;
+    Bubble& bubble = node->v;
+    for (int i = 0; i < bubble.chain_offsets.size(); ++i)
+    {
+        int last = i == bubble.chain_offsets.size() - 1 ? node->children.size() - 1 : bubble.chain_offsets[i+1] - 1;
+        vector<vg::id_t> chain_nodes;
+        for (int j = bubble.chain_offsets[i] + 1; j <= last; ++j) {
+            // only look at edges flanked on both sides by bubbles in the chain
+            vg::id_t chain_node = 0;
+            if (node->children[j-1]->v.end.node == node->children[j]->v.start.node ||
+                node->children[j-1]->v.end.node == node->children[j]->v.end.node) {
+                chain_node = node->children[j-1]->v.end.node;
+            } else if (node->children[j-1]->v.start.node == node->children[j]->v.start.node ||
+                       node->children[j-1]->v.start.node == node->children[j]->v.end.node) {
+                chain_node = node->children[j-1]->v.start.node;
+            }
+            assert(chain_node != 0);      
+            found_nodes.insert(chain_node);
+        }
+    }
+
+    vector<vg::id_t> missing_nodes;
+    graph.for_each_node([&](Node* node) {
+            if (found_nodes.count(node->id()) == false) {
+                missing_nodes.push_back(node->id());
+            }
+        });
+  
+    for (auto node : missing_nodes) {
+        missing_bs.add_bubble(graph, std::pair<vg::id_t, vg::id_t>(0, 0), vector<vg::id_t>(1, node), 1);
+    }
+
+    cout << "Missing stats" << endl << missing_bs << endl;
+    if (hist) {
+        *hist << "Missing Histograms" << endl;
+    }
+    histograms(hist, missing_bs, bin_size);
+    return missing_bs;
+}
+
+void overall_stats(VG& graph, BubbleStats& bs, BubbleStats& cs)
+{
+    int len = bs.tally_map[1].total_length + cs.tally_map[1].total_length;
+    int nodes = bs.tally_map[1].total_nc + cs.tally_map[1].total_nc;
+    cout << "Summary Stats" << endl;
+    cout << "Top Level Chains + Bubbles (Length)" << "\t"
+         << "Top Level Chains + Bubbles (Length Frac/" << bs.gs.first << ")\t"
+         << "Top Level Chains + Bubbles (Nodes)" << "\t"
+         << "Top Level Chains + Bubbles (Nodes Frac/" << bs.gs.second << endl;
+    cout << len  << "\t"
+         << ((double)len / bs.gs.first) << "\t"
+         << nodes  << "\t"
+         << ((double)nodes / bs.gs.second) << endl;
+    cout << "Missing Nodes" << "\t" << "Missing Length" << endl;
+    cout << (bs.gs.second - nodes) << "\t" << (bs.gs.first - len) << endl;
+}
 
 void ultra_stats(VG& graph, ostream* hist, int bin_size)
 {
@@ -322,7 +398,10 @@ void ultra_stats(VG& graph, ostream* hist, int bin_size)
     BubbleTree* bubble_tree = ultrabubble_tree(graph);
 
     cycle_stats(graph, bubble_tree);
-    chain_stats(graph, bubble_tree, hist, bin_size);
+    BubbleStats cs = chain_stats(graph, bubble_tree, hist, bin_size);
+    missing_stats(graph, bubble_tree, hist, bin_size);  
+    overall_stats(graph, bs, cs);
+    
     delete bubble_tree;
 }
 
