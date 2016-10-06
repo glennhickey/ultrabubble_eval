@@ -28,20 +28,35 @@ pair<int, int> graph_stats(VG& graph)
 
 // aggregate some bubble stats (count and length)
 struct BubbleStats {
-   
+
     struct Tally {
         int count; // number of bubbles counted
         int total_length; //length stats
         int min_length;
         int max_length;
+        map<int, int> length_hist;        
         int total_nc; // node-count stats
         int min_nc;
         int max_nc;
-
+        map<int, int> nc_hist;
 
         Tally() : count(0), total_length(0), min_length(999999), max_length(0),
                   total_nc(0), min_nc(999999), max_nc(0) {}
 
+        // add a bubble's length and node count to our histogram (which doesn't bin)
+        void update_hist(int length, int nc) {
+            if (length_hist.count(length)) {
+                ++length_hist[length];
+            } else {
+                length_hist[length] = 1;
+            }
+            if (nc_hist.count(nc)) {
+                ++nc_hist[nc];
+            } else {
+                nc_hist[nc] = 1;
+            }
+        }
+        
         // not sure why, but need to add std:: and vg:: here to compile despite using the namespaces...
         void add_bubble(VG& graph, std::pair<vg::id_t, vg::id_t> ends, const vector<vg::id_t>& bubble) {
             int nc = 0;
@@ -57,6 +72,7 @@ struct BubbleStats {
             total_nc += nc;
             min_nc = min(min_nc, nc);
             max_nc = max(max_nc, nc);
+            update_hist(length, nc);
         }
     };
    
@@ -174,6 +190,43 @@ ostream& operator<<(ostream& os, BubbleStats& bs) {
     return os;
 }
 
+void histograms(ostream* hist, BubbleStats& bs, int bin_size) {
+    if (hist == NULL){
+        return;
+    }
+    ostream& os = *hist;
+
+    function<map<int, int>(map<int, int>)> make_bins = [&](map<int, int> hist) -> map<int, int>{
+        map<int, int> binned_hist;
+        for (auto i : hist) {
+            int bin = i.first / bin_size;
+            if (binned_hist.count(bin)) {
+                binned_hist[bin] += i.second;
+            } else {
+                binned_hist[bin] = i.second;
+            }
+        }
+        return binned_hist;
+    };
+    
+    for (int i = 0; i < bs.tally_map.size(); ++i) {
+        const BubbleStats::Tally& t = bs.tally_map[i];
+
+        os << "Length Histogram for depth " << (i == 0 ? "all" : to_string(i)) << "\n";
+        map<int, int> binned_length = make_bins(t.length_hist);
+        for (auto i : binned_length) {
+            os << i.first << "\t" << i.second << "\n";
+        }
+        os << endl;
+        os << "Node Histogram for depth " << (i == 0 ? "all" : to_string(i)) << "\n";
+        map<int, int> binned_nc = make_bins(t.nc_hist);
+        for (auto i : binned_nc) {
+            os << i.first << "\t" << i.second << "\n";
+        }
+        os << endl;
+    }
+}
+
 void cycle_stats(VG& graph, BubbleTree* bubble_tree)
 {
     cerr << "Computing cycle stats" << endl;
@@ -206,7 +259,7 @@ void cycle_stats(VG& graph, BubbleTree* bubble_tree)
     cout << "Cyclic ultra bubbles stats" << endl << cyclic_bs << endl;
 }
 
-void chain_stats(VG& graph, BubbleTree* bubble_tree) {
+void chain_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int bin_size) {
     cerr << "Computing chain stats" << endl;
 
     auto get_depth = [&](BubbleTree::Node* node) {
@@ -245,10 +298,14 @@ void chain_stats(VG& graph, BubbleTree* bubble_tree) {
         });
 
     cout << "Chains stats" << endl << chains_bs << endl;
+    if (hist) {
+        *hist << "Chains Histograms" << endl;
+    }
+    histograms(hist, chains_bs, bin_size);
 }
 
 
-void ultra_stats(VG& graph)
+void ultra_stats(VG& graph, ostream* hist, int bin_size)
 {
     cerr << "Computing ultrabubbles" << endl;
     auto bubbles = vg::ultrabubbles(graph);
@@ -256,16 +313,20 @@ void ultra_stats(VG& graph)
     BubbleStats bs;
     bs.compute_stats(graph, bubbles);
     cout << "Ultra bubbles stats" << endl << bs << endl;
+    if (hist) {
+        *hist << "Bubble Histograms" << endl;
+    }
+    histograms(hist, bs, bin_size);
   
     cerr << "Computing ultrabubbles" << endl;
     BubbleTree* bubble_tree = ultrabubble_tree(graph);
 
     cycle_stats(graph, bubble_tree);
-    chain_stats(graph, bubble_tree);
+    chain_stats(graph, bubble_tree, hist, bin_size);
     delete bubble_tree;
 }
 
-void super_stats(VG& graph)
+void super_stats(VG& graph, ostream* hist, int bin_size)
 {
     cerr << "Computing superbubbles" << endl;
     auto bubbles = vg::superbubbles(graph);
@@ -280,7 +341,9 @@ void help_main(char** argv)
 {
     cerr << "usage: " << argv[0] << " [options] VGFILE" << endl
          << "Generate some reports on bubble decomposition of given graph" << endl
-         << "    -h, --help          print this help message" << endl;
+         << "    -h, --help          print this help message" << endl
+         << "    -b, --bin N         bin size for histograms [1]" << endl
+         << "    -i, --hist FILE     file name to write all histograms to in tsv format" << endl;
 }
 
 int main(int argc, char** argv)
@@ -291,18 +354,23 @@ int main(int argc, char** argv)
         help_main(argv);
         return 1;
     }
+
+    int bin_size = 1;
+    string hist_path;
     
     optind = 1; // Start at first real argument
     bool optionsRemaining = true;
     while(optionsRemaining) {
         static struct option longOptions[] = {
             {"help", no_argument, 0, 'h'},
+            {"bin", required_argument, 0, 'b'},
+            {"hist", required_argument, 0, 'i'},
             {0, 0, 0, 0}
         };
 
         int optionIndex = 0;
 
-        switch(getopt_long(argc, argv, "w:o:h", longOptions, &optionIndex)) {
+        switch(getopt_long(argc, argv, "w:o:hb:i:", longOptions, &optionIndex)) {
             // Option value is in global optarg
         case -1:
             optionsRemaining = false;
@@ -311,6 +379,13 @@ int main(int argc, char** argv)
             help_main(argv);
             exit(1);
             break;
+        case 'b':
+            bin_size = atoi(optarg);
+            break;
+        case 'i':
+            hist_path = optarg;
+            break;
+
         default:
             cerr << "Illegal option" << endl;
             exit(1);
@@ -325,6 +400,13 @@ int main(int argc, char** argv)
     }
 
     string vg_file = argv[optind++];
+
+    ostream* hist = NULL;
+    ofstream hist_file;
+    if (!hist_path.empty()) {
+        hist_file.open(hist_path.c_str());
+        hist = &hist_file;
+    }
     
     // Open the vg file
     cerr << "Loading vg" << endl;
@@ -338,8 +420,8 @@ int main(int argc, char** argv)
     cerr << "Sorting vg" << endl;
     graph.sort();
 
-    ultra_stats(graph);
-    super_stats(graph);
+    ultra_stats(graph, hist, bin_size);
+    super_stats(graph, hist, bin_size);
   
     return 0;
 }
