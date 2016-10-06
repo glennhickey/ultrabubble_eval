@@ -225,14 +225,22 @@ void chain_stats(VG& graph, BubbleTree* bubble_tree) {
             {
                 int last = i == bubble.chain_offsets.size() - 1 ? node->children.size() - 1 : bubble.chain_offsets[i+1] - 1;
                 vector<vg::id_t> chain_nodes;
-                for (int j = bubble.chain_offsets[i]; j <= last; ++j) {
-                    chain_nodes.push_back(node->children[i]->v.start.node);
-                    if (j == last) {
-                        chain_nodes.push_back(node->children[i]->v.end.node);
+                for (int j = bubble.chain_offsets[i] + 1; j <= last; ++j) {
+                    // only look at edges flanked on both sides by bubbles in the chain
+                    vg::id_t chain_node = 0;
+                    if (node->children[j-1]->v.end.node == node->children[j]->v.start.node ||
+                        node->children[j-1]->v.end.node == node->children[j]->v.end.node) {
+                        chain_node = node->children[j-1]->v.end.node;
+                    } else if (node->children[j-1]->v.start.node == node->children[j]->v.start.node ||
+                               node->children[j-1]->v.start.node == node->children[j]->v.end.node) {
+                        chain_node = node->children[j-1]->v.start.node;
                     }
+                    assert(chain_node != 0);
+                    chain_nodes.push_back(chain_node);
                 }
 
-                chains_bs.add_bubble(graph, std::pair<vg::id_t, vg::id_t>(0, 0), chain_nodes, get_depth(node));
+                chains_bs.add_bubble(graph, std::pair<vg::id_t, vg::id_t>(0, 0), chain_nodes, get_depth(node) + 1);
+
             }      
         });
 
