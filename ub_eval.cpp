@@ -150,7 +150,7 @@ ostream& operator<<(ostream& os, BubbleStats& bs) {
     os << "Depth\t" << "Count\t"
        << "Total-Length\t" << "Min-Length\t" << "Max-Length\t" << "Avg-Length\t"
        << "Frac-Length (/" << bs.gs.first << ")\t"
-       << "Total-Nodes\t" << "Min-Nodes\t" << "Max-Nodes\t" << "Avg-Nodes"
+       << "Total-Nodes\t" << "Min-Nodes\t" << "Max-Nodes\t" << "Avg-Nodes\t"
        << "Frac-Nodes (/" << bs.gs.second << ")\t"
        << endl;
     for (int i = 0; i < bs.tally_map.size(); ++i) {
