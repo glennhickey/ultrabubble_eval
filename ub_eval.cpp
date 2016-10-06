@@ -305,7 +305,7 @@ BubbleStats chain_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int b
     return chains_bs;
 }
 
-BubbleStats missing_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int bin_size) {
+BubbleStats missing_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int bin_size, ostream* missing) {
     cerr << "Computing missing stats" << endl;
     std::set<vg::id_t> found_nodes;
       
@@ -361,6 +361,12 @@ BubbleStats missing_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int
         *hist << "Missing Histograms" << endl;
     }
     histograms(hist, missing_bs, bin_size);
+
+    if (missing != NULL) {
+        for (auto n : missing_nodes) {
+            *missing << n << endl;
+        }
+    }
     return missing_bs;
 }
 
@@ -381,7 +387,7 @@ void overall_stats(VG& graph, BubbleStats& bs, BubbleStats& cs)
     cout << (bs.gs.second - nodes) << "\t" << (bs.gs.first - len) << endl;
 }
 
-void ultra_stats(VG& graph, ostream* hist, int bin_size)
+void ultra_stats(VG& graph, ostream* hist, int bin_size, ostream* missing)
 {
     cerr << "Computing ultrabubbles" << endl;
     auto bubbles = vg::ultrabubbles(graph);
@@ -399,7 +405,7 @@ void ultra_stats(VG& graph, ostream* hist, int bin_size)
 
     cycle_stats(graph, bubble_tree);
     BubbleStats cs = chain_stats(graph, bubble_tree, hist, bin_size);
-    missing_stats(graph, bubble_tree, hist, bin_size);  
+    missing_stats(graph, bubble_tree, hist, bin_size, missing);  
     overall_stats(graph, bs, cs);
     
     delete bubble_tree;
@@ -422,7 +428,8 @@ void help_main(char** argv)
          << "Generate some reports on bubble decomposition of given graph" << endl
          << "    -h, --help          print this help message" << endl
          << "    -b, --bin N         bin size for histograms [1]" << endl
-         << "    -i, --hist FILE     file name to write all histograms to in tsv format" << endl;
+         << "    -i, --hist FILE     file name to write all histograms to in tsv format" << endl
+         << "    -m, --missing FILE  file name to write all node ids that are not in covered by chain or bubble" << endl;
 }
 
 int main(int argc, char** argv)
@@ -436,6 +443,7 @@ int main(int argc, char** argv)
 
     int bin_size = 1;
     string hist_path;
+    string missing_path;
     
     optind = 1; // Start at first real argument
     bool optionsRemaining = true;
@@ -444,12 +452,13 @@ int main(int argc, char** argv)
             {"help", no_argument, 0, 'h'},
             {"bin", required_argument, 0, 'b'},
             {"hist", required_argument, 0, 'i'},
+            {"missing", required_argument, 0, 'm'},
             {0, 0, 0, 0}
         };
 
         int optionIndex = 0;
 
-        switch(getopt_long(argc, argv, "w:o:hb:i:", longOptions, &optionIndex)) {
+        switch(getopt_long(argc, argv, "w:o:hb:i:m:", longOptions, &optionIndex)) {
             // Option value is in global optarg
         case -1:
             optionsRemaining = false;
@@ -464,7 +473,10 @@ int main(int argc, char** argv)
         case 'i':
             hist_path = optarg;
             break;
-
+        case 'm':
+            missing_path = optarg;
+            break;
+            
         default:
             cerr << "Illegal option" << endl;
             exit(1);
@@ -486,6 +498,13 @@ int main(int argc, char** argv)
         hist_file.open(hist_path.c_str());
         hist = &hist_file;
     }
+
+    ostream* missing = NULL;
+    ofstream missing_file;
+    if (!missing_path.empty()) {
+        missing_file.open(missing_path.c_str());
+        missing = &missing_file;
+    }
     
     // Open the vg file
     cerr << "Loading vg" << endl;
@@ -499,7 +518,7 @@ int main(int argc, char** argv)
     cerr << "Sorting vg" << endl;
     graph.sort();
 
-    ultra_stats(graph, hist, bin_size);
+    ultra_stats(graph, hist, bin_size, missing);
     super_stats(graph, hist, bin_size);
   
     return 0;
