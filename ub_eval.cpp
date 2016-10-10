@@ -79,6 +79,8 @@ struct BubbleStats {
     vector<Tally> tally_map; // stats sfor given depth of nestedness
     std::map<vg::id_t, int> visit_count;  // keep track of depth (make sure we visit bubbles in order of size)
     pair<int, int> gs; // stats for whole graph (total length, total nodes)
+    // dont include in tally (but keep for depth computations), used to break out cyclic/acyclic
+    set<pair<vg::id_t, vg::id_t>> ignore_ends; 
 
     void add_bubble(VG& graph, std::pair<vg::id_t, vg::id_t> ends, const vector<vg::id_t>& bubble) {
 
@@ -119,13 +121,15 @@ struct BubbleStats {
     }
 
     void add_bubble(VG& graph, std::pair<vg::id_t, vg::id_t> ends, const vector<vg::id_t>& bubble, int depth) {
-        // add bubble stats to tracker for the given depth
-        while (tally_map.size() < depth + 1) {
-            tally_map.push_back(Tally());
+        if (!ignore_ends.count(ends) && !ignore_ends.count(make_pair(ends.second, ends.first))) {   
+            // add bubble stats to tracker for the given depth
+            while (tally_map.size() < depth + 1) {
+                tally_map.push_back(Tally());
+            }
+            tally_map[depth].add_bubble(graph, ends, bubble);
+            // add bubble stats for overall count
+            tally_map[0].add_bubble(graph, ends, bubble);
         }
-        tally_map[depth].add_bubble(graph, ends, bubble);
-        // add bubble stats for overall count
-        tally_map[0].add_bubble(graph, ends, bubble);            
     }
    
     struct bub_less {
@@ -234,25 +238,30 @@ void cycle_stats(VG& graph, BubbleTree* bubble_tree)
     // start by splitting bubbles into two groups by cyclicity
     std::map<std::pair<vg::id_t, vg::id_t>, std::vector<vg::id_t> > acyclic_bubbles;
     std::map<std::pair<vg::id_t, vg::id_t>, std::vector<vg::id_t> > cyclic_bubbles;
-  
+
+    BubbleStats acyclic_bs;
+    BubbleStats cyclic_bs;
+
     bubble_tree->for_each_preorder([&](BubbleTree::Node* node) {
             // cut root to be consistent with superbubbles()
             if (node != bubble_tree->root) {
                 Bubble& bubble = node->v;
                 // sort nodes to be consistent with superbubbles
                 sort(bubble.contents.begin(), bubble.contents.end());
+                // all bubbles get added to each stats (so we can compute depth)
+                // but we use the ignore_ends member to make sure we conly count ones we want
+                acyclic_bubbles[make_pair(bubble.start.node, bubble.end.node)] = bubble.contents;
+                cyclic_bubbles[make_pair(bubble.start.node, bubble.end.node)] = bubble.contents;
                 if (bubble.acyclic) {
-                    acyclic_bubbles[make_pair(bubble.start.node, bubble.end.node)] = bubble.contents;
+                    cyclic_bs.ignore_ends.insert(make_pair(bubble.start.node, bubble.end.node));
                 } else {
-                    cyclic_bubbles[make_pair(bubble.start.node, bubble.end.node)] = bubble.contents;
+                    acyclic_bs.ignore_ends.insert(make_pair(bubble.start.node, bubble.end.node));
                 }
             }
         });
 
     // now just rerun our stats separately on each group
-    BubbleStats acyclic_bs;
     acyclic_bs.compute_stats(graph, acyclic_bubbles);
-    BubbleStats cyclic_bs;
     cyclic_bs.compute_stats(graph, cyclic_bubbles);
 
     cout << "Acyclic ultra bubbles stats" << endl << acyclic_bs << endl;  
