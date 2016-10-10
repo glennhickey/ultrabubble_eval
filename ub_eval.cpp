@@ -300,9 +300,9 @@ BubbleStats chain_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int b
                     assert(chain_node != 0);
                     chain_nodes.push_back(chain_node);
                 }
-
-                chains_bs.add_bubble(graph, std::pair<vg::id_t, vg::id_t>(0, 0), chain_nodes, get_depth(node) + 1);
-
+                if (chain_nodes.size() > 0) {
+                    chains_bs.add_bubble(graph, std::pair<vg::id_t, vg::id_t>(0, 0), chain_nodes, get_depth(node) + 1);
+                }
             }      
         });
 
