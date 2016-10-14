@@ -231,7 +231,7 @@ void histograms(ostream* hist, BubbleStats& bs, int bin_size) {
     }
 }
 
-void cycle_stats(VG& graph, BubbleTree* bubble_tree)
+void cycle_stats(VG& graph, BubbleTree* bubble_tree, int size_cap = -1)
 {
     cerr << "Computing cycle stats" << endl;
 
@@ -241,6 +241,18 @@ void cycle_stats(VG& graph, BubbleTree* bubble_tree)
 
     BubbleStats acyclic_bs;
     BubbleStats cyclic_bs;
+
+    // length of nodes that aren't endpoints in bubble
+    function<size_t(Bubble&)> bub_length = [&](Bubble& bubble) {
+        size_t len = 0;
+        for (auto bi : bubble.contents) {
+            if (bi != bubble.start.node && bi != bubble.end.node) {
+                Node* node = graph.get_node(bi);
+                len += node->sequence().length();
+            }
+        }
+        return len;
+    };
 
     bubble_tree->for_each_preorder([&](BubbleTree::Node* node) {
             // cut root to be consistent with superbubbles()
@@ -254,6 +266,11 @@ void cycle_stats(VG& graph, BubbleTree* bubble_tree)
                 cyclic_bubbles[make_pair(bubble.start.node, bubble.end.node)] = bubble.contents;
                 if (bubble.acyclic) {
                     cyclic_bs.ignore_ends.insert(make_pair(bubble.start.node, bubble.end.node));
+                    
+                    // optionally ignore acyclic bubbles bigger than size_cap
+                    if (size_cap >= 0 && bub_length(bubble) > size_cap) {
+                        acyclic_bs.ignore_ends.insert(make_pair(bubble.start.node, bubble.end.node));
+                    }
                 } else {
                     acyclic_bs.ignore_ends.insert(make_pair(bubble.start.node, bubble.end.node));
                 }
@@ -262,10 +279,13 @@ void cycle_stats(VG& graph, BubbleTree* bubble_tree)
 
     // now just rerun our stats separately on each group
     acyclic_bs.compute_stats(graph, acyclic_bubbles);
-    cyclic_bs.compute_stats(graph, cyclic_bubbles);
-
-    cout << "Acyclic ultra bubbles stats" << endl << acyclic_bs << endl;  
-    cout << "Cyclic ultra bubbles stats" << endl << cyclic_bs << endl;
+    if (size_cap >= 0) {
+        cout << "Acyclic ultra bubbles with length <= " << size_cap << " stats" << endl << acyclic_bs << endl;
+    } else {
+        cout << "Acyclic ultra bubbles stats" << endl << acyclic_bs << endl;
+        cyclic_bs.compute_stats(graph, cyclic_bubbles);
+        cout << "Cyclic ultra bubbles stats" << endl << cyclic_bs << endl;
+    }
 }
 
 BubbleStats chain_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int bin_size) {
@@ -396,7 +416,7 @@ void overall_stats(VG& graph, BubbleStats& bs, BubbleStats& cs)
     cout << (bs.gs.second - nodes) << "\t" << (bs.gs.first - len) << endl;
 }
 
-void ultra_stats(VG& graph, ostream* hist, int bin_size, ostream* missing)
+void ultra_stats(VG& graph, ostream* hist, int bin_size, ostream* missing, int size_cap)
 {
     cerr << "Computing ultrabubbles" << endl;
     auto bubbles = vg::ultrabubbles(graph);
@@ -413,6 +433,7 @@ void ultra_stats(VG& graph, ostream* hist, int bin_size, ostream* missing)
     BubbleTree* bubble_tree = ultrabubble_tree(graph);
 
     cycle_stats(graph, bubble_tree);
+    cycle_stats(graph, bubble_tree, size_cap); 
     BubbleStats cs = chain_stats(graph, bubble_tree, hist, bin_size);
     missing_stats(graph, bubble_tree, hist, bin_size, missing);  
     overall_stats(graph, bs, cs);
@@ -438,7 +459,8 @@ void help_main(char** argv)
          << "    -h, --help          print this help message" << endl
          << "    -b, --bin N         bin size for histograms [1]" << endl
          << "    -i, --hist FILE     file name to write all histograms to in tsv format" << endl
-         << "    -m, --missing FILE  file name to write all node ids that are not in covered by chain or bubble" << endl;
+         << "    -m, --missing FILE  file name to write all node ids that are not in covered by chain or bubble" << endl
+         << "    -l, --length N      print separate statistics of bubbles <= N bases [default=100]" << endl;
 }
 
 int main(int argc, char** argv)
@@ -453,6 +475,7 @@ int main(int argc, char** argv)
     int bin_size = 1;
     string hist_path;
     string missing_path;
+    int size_cap = 100;
     
     optind = 1; // Start at first real argument
     bool optionsRemaining = true;
@@ -462,12 +485,13 @@ int main(int argc, char** argv)
             {"bin", required_argument, 0, 'b'},
             {"hist", required_argument, 0, 'i'},
             {"missing", required_argument, 0, 'm'},
+            {"length", required_argument, 0, 'l'},
             {0, 0, 0, 0}
         };
 
         int optionIndex = 0;
 
-        switch(getopt_long(argc, argv, "w:o:hb:i:m:", longOptions, &optionIndex)) {
+        switch(getopt_long(argc, argv, "w:o:hb:i:m:l:", longOptions, &optionIndex)) {
             // Option value is in global optarg
         case -1:
             optionsRemaining = false;
@@ -485,7 +509,9 @@ int main(int argc, char** argv)
         case 'm':
             missing_path = optarg;
             break;
-            
+        case 'l':
+            size_cap = atoi(optarg);
+            break;            
         default:
             cerr << "Illegal option" << endl;
             exit(1);
@@ -527,7 +553,7 @@ int main(int argc, char** argv)
     cerr << "Sorting vg" << endl;
     graph.sort();
 
-    ultra_stats(graph, hist, bin_size, missing);
+    ultra_stats(graph, hist, bin_size, missing, size_cap);
     super_stats(graph, hist, bin_size);
   
     return 0;
