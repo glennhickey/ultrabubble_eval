@@ -552,8 +552,6 @@ int main(int argc, char** argv)
         exit(1);
     }
     VG graph(vgStream);
-    cerr << "Sorting vg" << endl;
-    graph.sort();
 
     ultra_stats(graph, hist, bin_size, missing, size_cap);
     super_stats(graph, hist, bin_size);
