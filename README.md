@@ -20,6 +20,7 @@ Note: loading vg graphs into memory is RAM intensive.  Expect to use about 40G f
 ### Whole Genome Results
 
 This takes approximately ?? days and ??G of memory
+
     for i in $(seq 1 22; echo X; echo Y);
     do
          vg construct -f -R $i -r hs37d5.fa -v ALL.wgs.phase3_shapeit2_mvncall_integrated_v5b.20130502.sites.vcf.gz -t 15 -m 100 >$i.vg 2>$i.err
