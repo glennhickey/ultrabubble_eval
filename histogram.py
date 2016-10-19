@@ -347,7 +347,7 @@ def main(args):
             bin_counts, _, bar_patches = pyplot.hist(data, bins,
                 cumulative=options.cumulative, log=options.log_counts,
                 weights=weights, alpha=0.5 if len(options.data) > 1 else 1.0,
-                label=label)
+                                                     label=label, color="#000000")
             
         
             
