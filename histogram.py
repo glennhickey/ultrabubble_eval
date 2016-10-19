@@ -344,12 +344,6 @@ def main(args):
         else:
             # Do the plot. Do cumulative, or logarithmic Y axis, optionally.
             # Keep the bin total counts and the bar patches.
-            print bins
-            #labels = pyplot.gca().get_xticklabels().tolist()
-            #labels[0] = "101"
-            if options.sparse_ticks:
-                pyplot.gca().set_xticklabels([101, 200000, 400000, 600000, 800000, 1000000, 1200000, 1400000])
-
             bin_counts, _, bar_patches = pyplot.hist(data, bins,
                 cumulative=options.cumulative, log=options.log_counts,
                 weights=weights, alpha=0.5 if len(options.data) > 1 else 1.0,
@@ -438,12 +432,18 @@ def main(args):
         pyplot.ylim((pyplot.ylim()[0], options.y_max))
         
     if options.sparse_ticks:
+        # hack to get tail plot to work and start at 101 instead of 0s.
+        # values hard coded!  if change data, comment out
+        # set_xticklabels() to see what they should be and change accordingly
+        pyplot.locator_params(axis='x',nbins=3)
+        pyplot.gca().set_xticklabels([101, 500000, 1000000, 1500000])
+
         # Set up tickmarks to have only 2 per axis, at the ends
-        pyplot.gca().xaxis.set_major_locator(
-            matplotlib.ticker.FixedLocator(pyplot.xlim()))
+        #pyplot.gca().xaxis.set_major_locator(
+        #    matplotlib.ticker.FixedLocator(pyplot.xlim()))
         #pyplot.gca().yaxis.set_major_locator(
         #    matplotlib.ticker.FixedLocator(pyplot.ylim()))
-            
+
     # Make sure tick labels don't overlap. See
     # <http://stackoverflow.com/a/20599129/402891>
     pyplot.gca().tick_params(axis="x", pad=0.5 * options.font_size)
