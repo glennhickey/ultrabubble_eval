@@ -65,14 +65,16 @@ struct BubbleStats {
                 ++nc;
                 length += graph.get_node(nid)->sequence().length();
             }
-            ++count;
-            total_length += length;
-            min_length = min(min_length, length);
-            max_length = max(max_length, length);
-            total_nc += nc;
-            min_nc = min(min_nc, nc);
-            max_nc = max(max_nc, nc);
-            update_hist(length, nc);
+            if (length > 0) {
+                ++count;
+                total_length += length;
+                min_length = min(min_length, length);
+                max_length = max(max_length, length);
+                total_nc += nc;
+                min_nc = min(min_nc, nc);
+                max_nc = max(max_nc, nc);
+                update_hist(length, nc);
+            }
         }
     };
    
