@@ -436,7 +436,7 @@ def main(args):
         # values hard coded!  if change data, comment out
         # set_xticklabels() to see what they should be and change accordingly
         pyplot.locator_params(axis='x',nbins=3)
-        pyplot.gca().set_xticklabels([101, 500000, 1000000, 1500000])
+        #pyplot.gca().set_xticklabels([101, 500000, 1000000, 1500000])
 
         # Set up tickmarks to have only 2 per axis, at the ends
         #pyplot.gca().xaxis.set_major_locator(
