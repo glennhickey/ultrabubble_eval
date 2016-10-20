@@ -242,7 +242,7 @@ void histograms(ostream* hist, BubbleStats& bs, int bin_size) {
     }
 }
 
-void cycle_stats(VG& graph, BubbleTree* bubble_tree, int size_cap = -1)
+void cycle_stats(VG& graph, BubbleTree* bubble_tree, int size_cap, ostream* hist, int bin_size)
 {
     cerr << "Computing cycle stats" << endl;
 
@@ -296,6 +296,16 @@ void cycle_stats(VG& graph, BubbleTree* bubble_tree, int size_cap = -1)
         cout << "Acyclic ultra bubble stats" << endl << acyclic_bs << endl;
         cyclic_bs.compute_stats(graph, cyclic_bubbles);
         cout << "Snarl stats" << endl << cyclic_bs << endl;
+
+        if (hist) {
+          *hist << "Acyclic ultra bubbles histograms" << endl;
+        }
+        histograms(hist, acyclic_bs, bin_size);
+
+        if (hist) {
+          *hist << "Snarls histograms" << endl;
+        }
+        histograms(hist, cyclic_bs, bin_size);
     }
 }
 
@@ -441,12 +451,12 @@ void ultra_stats(VG& graph, ostream* hist, int bin_size, ostream* missing, int s
         *hist << "Bubble Histograms" << endl;
     }
     histograms(hist, bs, bin_size);
-  
+    
     cerr << "Computing ultrabubbles" << endl;
     BubbleTree* bubble_tree = ultrabubble_tree(graph);
 
-    cycle_stats(graph, bubble_tree);
-    cycle_stats(graph, bubble_tree, size_cap); 
+    cycle_stats(graph, bubble_tree, -1, hist, bin_size);
+    cycle_stats(graph, bubble_tree, size_cap, hist, bin_size); 
     BubbleStats cs = chain_stats(graph, bubble_tree, hist, bin_size);
     missing_stats(graph, bubble_tree, hist, bin_size, missing);  
     overall_stats(graph, bs, cs);
