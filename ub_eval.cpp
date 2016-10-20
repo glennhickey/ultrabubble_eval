@@ -58,7 +58,7 @@ struct BubbleStats {
         }
         
         // not sure why, but need to add std:: and vg:: here to compile despite using the namespaces...
-        void add_bubble(VG& graph, std::pair<vg::id_t, vg::id_t> ends, const vector<vg::id_t>& bubble) {
+        void add_bubble(VG& graph, std::pair<vg::NodeSide, vg::NodeSide> ends, const vector<vg::id_t>& bubble) {
             int nc = 0;
             int length = 0;
             for (auto nid : bubble) {
@@ -82,9 +82,9 @@ struct BubbleStats {
     std::map<vg::id_t, int> visit_count;  // keep track of depth (make sure we visit bubbles in order of size)
     pair<int, int> gs; // stats for whole graph (total length, total nodes)
     // dont include in tally (but keep for depth computations), used to break out cyclic/acyclic
-    set<pair<vg::id_t, vg::id_t>> ignore_ends; 
+    set<pair<vg::NodeSide, vg::NodeSide>> ignore_ends; 
 
-    void add_bubble(VG& graph, std::pair<vg::id_t, vg::id_t> ends, const vector<vg::id_t>& bubble) {
+    void add_bubble(VG& graph, std::pair<vg::NodeSide, vg::NodeSide> ends, const vector<vg::id_t>& bubble) {
 
         // figure out how many times we've seen the nodes in the bubble
         int depth = 1;
@@ -97,10 +97,10 @@ struct BubbleStats {
         }
         // for empty bubble, we infer depth from endpoints
         else {
-            node = graph.get_node(ends.first);
+            node = graph.get_node(ends.first.node);
             if (visit_count.count(node->id())) {
                 depth = visit_count[node->id()];
-                assert (depth == visit_count[ends.second]);
+                assert (depth == visit_count[ends.second.node]);
             }
         }
 
@@ -122,7 +122,7 @@ struct BubbleStats {
         add_bubble(graph, ends, bubble, depth);
     }
 
-    void add_bubble(VG& graph, std::pair<vg::id_t, vg::id_t> ends, const vector<vg::id_t>& bubble, int depth) {
+    void add_bubble(VG& graph, std::pair<vg::NodeSide, vg::NodeSide> ends, const vector<vg::id_t>& bubble, int depth) {
         if (!ignore_ends.count(ends) && !ignore_ends.count(make_pair(ends.second, ends.first))) {   
             // add bubble stats to tracker for the given depth
             while (tally_map.size() < depth + 1) {
@@ -139,17 +139,17 @@ struct BubbleStats {
             return b1.size() < b2.size();
         }
     };
-   
-    void compute_stats(VG& graph, const std::map<std::pair<vg::id_t, vg::id_t>, std::vector<vg::id_t>>& bubbles) {
+    
+    void compute_stats(VG& graph, const std::map<std::pair<vg::NodeSide, vg::NodeSide>, std::vector<vg::id_t>>& bubbles) {
         // we want to visit bubbles in decreasing size (measured in number of nodes)
         // this will guarantee that if bubble A is nested inside B, then B is visited
         // first, and our lookup for computing depth will make sense
-        std::multimap<std::vector<vg::id_t>, std::pair<vg::id_t, vg::id_t>, bub_less> sorted_bubbles;
+        std::multimap<std::vector<vg::id_t>, std::pair<vg::NodeSide, vg::NodeSide>, bub_less> sorted_bubbles;
         for (auto b : bubbles) {
             // strip off endpoints , we don't want to count them because they aren't *in* the bubble
             vector<vg::id_t> bub;
             for (auto u : b.second) {
-                if (u != b.first.first && u != b.first.second) {
+                if (u != b.first.first.node && u != b.first.second.node) {
                     bub.push_back(u);
                 }
             }
@@ -165,6 +165,15 @@ struct BubbleStats {
         }
         // this really should be moved outside to avoid doing over and over
         gs = graph_stats(graph);
+    }
+
+    // hack to let superbubbles run through same interface even though we dont get sides out of it. 
+    void compute_stats(VG& graph, const std::map<std::pair<vg::id_t, vg::id_t>, std::vector<vg::id_t>>& bubbles) {
+        std::map<std::pair<vg::NodeSide, vg::NodeSide>, std::vector<vg::id_t>> ns_bubbles;
+        for (auto b : bubbles) {
+            ns_bubbles[make_pair(NodeSide(b.first.first), NodeSide(b.first.second))] = b.second;
+        }
+        compute_stats(graph, ns_bubbles);
     }
 };
 
@@ -323,7 +332,8 @@ BubbleStats chain_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int b
                     chain_nodes.push_back(chain_node);
                 }
                 if (chain_nodes.size() > 0) {
-                    chains_bs.add_bubble(graph, std::pair<vg::id_t, vg::id_t>(0, 0), chain_nodes, get_depth(node) + 1);
+                    chains_bs.add_bubble(graph, std::pair<vg::NodeSide, vg::NodeSide>(NodeSide(0), NodeSide(0)),
+                                         chain_nodes, get_depth(node) + 1);
                 }
             }      
         });
@@ -384,7 +394,8 @@ BubbleStats missing_stats(VG& graph, BubbleTree* bubble_tree, ostream* hist, int
         });
   
     for (auto node : missing_nodes) {
-        missing_bs.add_bubble(graph, std::pair<vg::id_t, vg::id_t>(0, 0), vector<vg::id_t>(1, node), 1);
+        missing_bs.add_bubble(graph, std::pair<vg::NodeSide, vg::NodeSide>(NodeSide(0), NodeSide(0)),
+                              vector<vg::id_t>(1, node), 1);
     }
 
     cout << "Missing stats" << endl << missing_bs << endl;
