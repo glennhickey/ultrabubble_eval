@@ -293,9 +293,9 @@ void cycle_stats(VG& graph, BubbleTree* bubble_tree, int size_cap = -1)
     if (size_cap >= 0) {
         cout << "Acyclic ultra bubbles with length <= " << size_cap << " stats" << endl << acyclic_bs << endl;
     } else {
-        cout << "Acyclic ultra bubbles stats" << endl << acyclic_bs << endl;
+        cout << "Acyclic ultra bubble stats" << endl << acyclic_bs << endl;
         cyclic_bs.compute_stats(graph, cyclic_bubbles);
-        cout << "Cyclic ultra bubbles stats" << endl << cyclic_bs << endl;
+        cout << "Snarl stats" << endl << cyclic_bs << endl;
     }
 }
 
