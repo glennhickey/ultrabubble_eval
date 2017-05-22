@@ -6,7 +6,7 @@ VGDIR=../vg
 
 VGLIBDIR=$(VGDIR)/lib
 CXX=g++
-INCLUDES=-I$(VGDIR)/ -I$(VGDIR)/include
+INCLUDES=-I$(VGDIR)/ -I$(VGDIR)/include -I$(VGDIR)/include/dynamic -I$(VGDIR)/include/sonLib -I$(VGDIR)/include/gcsa
 CXXFLAGS:=-O3 -msse4.1 -fopenmp -std=c++11 -ggdb -g $(INCLUDES)
 LDSEARCH=-L$(VGDIR)/src -L$(VGLIBDIR)
 LDFLAGS=-lm -lpthread -lz -lbz2 -lsnappy -ldivsufsort -ldivsufsort64 -ljansson $(LDSEARCH)
@@ -15,6 +15,7 @@ LIBXG=$(VGLIBDIR)/libxg.a
 LIBPROTOBUF=$(VGLIBDIR)/libprotobuf.a
 LIBSDSL=$(VGLIBDIR)/libsdsl.a
 LIBGSSW=$(VGLIBDIR)/libgssw.a
+LIBSSW=$(VGLIBDIR)/libssw.a
 LIBSNAPPY=$(VGLIBDIR)/libsnappy.a
 LIBROCKSDB=$(VGLIBDIR)/librocksdb.a
 LIBHTS=$(VGLIBDIR)/libhts.a
@@ -26,7 +27,7 @@ LIBSUPBUB=$(VGLIBDIR)/libsupbub.a
 LIBSONLIB=$(VGLIBDIR)/libsonlib.a
 LIBPINCHESANDCACTI=$(VGLIBDIR)/libpinchesandcacti.a
 LIB3EDGECONNECTED=$(VGLIBDIR)/lib3edgeconnected.a
-VGLIBS=$(LIBVG) $(LIBXG) $(LIBVCFLIB) $(LIBGSSW) $(LIBSNAPPY) $(LIBROCKSDB) $(LIBHTS) $(LIBGCSA2) $(LIBPROTOBUF) $(LIBRAPTOR) $(LIBGFAK) $(LIBSUPBUB) $(LIBSDSL) $(LIBPINCHESANDCACTI) $(LIB3EDGECONNECTED) $(LIBSONLIB)
+VGLIBS=$(LIBVG) $(LIBXG) $(LIBVCFLIB) $(LIBGSSW) $(LIBSSW) $(LIBSNAPPY) $(LIBROCKSDB) $(LIBHTS) $(LIBGCSA2) $(LIBPROTOBUF) $(LIBRAPTOR) $(LIBGFAK) $(LIBSUPBUB) $(LIBSDSL) $(LIBPINCHESANDCACTI) $(LIB3EDGECONNECTED) $(LIBSONLIB)
 
 #Some little adjustments to build on OSX
 #(tested with gcc4.9 and jansson installed from MacPorts)

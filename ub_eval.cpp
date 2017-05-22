@@ -7,12 +7,23 @@
 #include <iostream>
 #include <fstream>
 #include <getopt.h>
+#include <chrono>
+#include <ctime>
 
 #include "src/vg.hpp"
 
 using namespace vg;
 using namespace std;
 
+
+// time as string
+string timestring()
+{
+    std::chrono::time_point<std::chrono::system_clock> t;
+    t = std::chrono::system_clock::now();
+    std::time_t ct = std::chrono::system_clock::to_time_t(t);
+    return std::ctime(&ct);
+}
 
 // get total length, total nodes in graph
 pair<int, int> graph_stats(VG& graph)
@@ -81,7 +92,7 @@ struct BubbleStats {
     vector<Tally> tally_map; // stats sfor given depth of nestedness
     std::map<vg::id_t, int> visit_count;  // keep track of depth (make sure we visit bubbles in order of size)
     pair<int, int> gs; // stats for whole graph (total length, total nodes)
-    // dont include in tally (but keep for depth computations), used to break out cyclic/acyclic
+    // dont include in tally (but keep for depth computations), used to break out cyclic/dag
     set<pair<vg::NodeSide, vg::NodeSide>> ignore_ends; 
 
     void add_bubble(VG& graph, std::pair<vg::NodeSide, vg::NodeSide> ends, const vector<vg::id_t>& bubble) {
@@ -275,7 +286,7 @@ void cycle_stats(VG& graph, BubbleTree* bubble_tree, int size_cap, ostream* hist
                 // but we use the ignore_ends member to make sure we conly count ones we want
                 acyclic_bubbles[make_pair(bubble.start.node, bubble.end.node)] = bubble.contents;
                 cyclic_bubbles[make_pair(bubble.start.node, bubble.end.node)] = bubble.contents;
-                if (bubble.acyclic) {
+                if (bubble.dag) {
                     cyclic_bs.ignore_ends.insert(make_pair(bubble.start.node, bubble.end.node));
                     
                     // optionally ignore acyclic bubbles bigger than size_cap
@@ -441,9 +452,9 @@ void overall_stats(VG& graph, BubbleStats& bs, BubbleStats& cs)
 
 void ultra_stats(VG& graph, ostream* hist, int bin_size, ostream* missing, int size_cap)
 {
-    cerr << "Computing ultrabubbles" << endl;
+    cerr << "Computing ultrabubbles " << timestring() << endl;
     auto bubbles = vg::ultrabubbles(graph);
-    cerr << "Running ultra stats on " << bubbles.size() << " bubbles" << endl;
+    cerr << "Running ultra stats on " << bubbles.size() << " bubbles " << timestring() << endl;
     BubbleStats bs;
     bs.compute_stats(graph, bubbles);
     cout << "Ultra bubbles stats" << endl << bs << endl;
@@ -565,7 +576,7 @@ int main(int argc, char** argv)
     }
     
     // Open the vg file
-    cerr << "Loading vg" << endl;
+    cerr << "Loading vg " << timestring() << endl;
     ifstream vgStream(vg_file);
     if(!vgStream.good())
     {
@@ -573,6 +584,7 @@ int main(int argc, char** argv)
         exit(1);
     }
     VG graph(vgStream);
+    cerr << "Finished loading v " << timestring() << endl;
 
     ultra_stats(graph, hist, bin_size, missing, size_cap);
     super_stats(graph, hist, bin_size);
